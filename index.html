@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Box Excel Gmail Test</title>
+<script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+<style>body{font:14px system-ui,Arial,sans-serif;padding:18px;line-height:1.5}button{padding:10px 14px;cursor:pointer}#status{white-space:pre-wrap;margin-top:14px}code{background:#eee;padding:2px}</style>
+</head>
+<body>
+<h2>Box → Excel → Gmail test</h2>
+<p>In a <strong>fictional-data</strong> Box workbook, put a parent name in D5, a child name in F5, and an email in I5. Select any cell in row 5, then click the button.</p>
+<button id="run" disabled>Read row and open Gmail draft</button>
+<div id="status">Waiting for Excel...</div>
+<script>
+const status = document.getElementById('status');
+const button = document.getElementById('run');
+Office.onReady(info => {
+ if(info.host !== Office.HostType.Excel){status.textContent='This page is not running inside Excel.';return;}
+ status.textContent='Excel connected. Select a row and click the button.';
+ button.disabled=false;
+});
+button.addEventListener('click', async () => {
+ button.disabled=true;
+ try {
+  const data=await Excel.run(async context => {
+   const selection=context.workbook.getSelectedRange();
+   selection.load('rowIndex,rowCount');
+   await context.sync();
+   if(selection.rowCount!==1) throw new Error('Select a cell or cells within one row.');
+   const sheet=selection.worksheet;
+   const row=selection.rowIndex+1;
+   const parent=sheet.getRange(`D${row}`);
+   const child=sheet.getRange(`F${row}`);
+   const email=sheet.getRange(`I${row}`);
+   parent.load('values');child.load('values');email.load('values');
+   await context.sync();
+   return {row,parent:String(parent.values[0][0]??'').trim(),child:String(child.values[0][0]??'').trim(),email:String(email.values[0][0]??'').trim()};
+  });
+  if(!data.email || !data.email.includes('@')) throw new Error('Column I needs a fictional test email address.');
+  const subject=`Research study test — ${data.child}`;
+  const body=`Hello ${data.parent},\n\nThis is a test draft for ${data.child}. No message has been sent.\n\nTest only`;
+  const url='https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(data.email)+'&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+  status.textContent=`Read row ${data.row}. Opening Gmail draft for ${data.email}. If nothing opens, check popup blocking.`;
+  window.open(url,'_blank','noopener');
+ } catch(err){status.textContent='Error: '+(err.message||String(err));}
+ finally {button.disabled=false;}
+});
+</script>
+</body>
+</html>
